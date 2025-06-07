@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/TitechMeister/Neon/altimeter"
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
 )
@@ -13,6 +14,7 @@ func main() {
 	e := echo.New()
 	// Create a new Echo instance, which is a web framework for Go.
 	e.GET("/ping", ping)
+	e.GET("/altimeter", altimeter.GetAltimeterData)
 	// Define a route that listens for GET requests on the /ping endpoint and calls the ping function.
 	// middlewareのロガーを利用する
 	e.Use(middleware.Logger())
