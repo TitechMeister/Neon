@@ -12,9 +12,11 @@ func main() {
 	// For example, you might want to initialize the application, set up routes, or start a server.
 
 	e := echo.New()
+	altimeter := altimeter.New() // Create a new instance of the Altimeter struct
 	// Create a new Echo instance, which is a web framework for Go.
 	e.GET("/ping", ping)
 	e.GET("/altimeter", altimeter.GetAltimeterData)
+	e.GET("/altimeter/history", altimeter.GetAltimeterHistory)
 	// Define a route that listens for GET requests on the /ping endpoint and calls the ping function.
 	// middlewareのロガーを利用する
 	e.Use(middleware.Logger())

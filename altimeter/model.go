@@ -4,7 +4,7 @@ import "time"
 
 // altimeter model
 // 中身は相談しながら決める
-type Altimeter struct {
+type AltimeterData struct {
 	// Altitude in meters
 	Altitude float64 `json:"altitude"`
 	// Pressure in hPa
@@ -19,3 +19,10 @@ type Altimeter struct {
 	DeviceID string `json:"device_id"`
 	// Location of the altimeter
 }
+
+// Altimeterのクラス
+type Altimeter struct {
+	// データの履歴配列
+	DataHistory []AltimeterData `json:"data_history"`
+}
+
