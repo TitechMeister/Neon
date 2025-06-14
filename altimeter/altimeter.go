@@ -34,6 +34,23 @@ func (handler *Altimeter) GetAltimeterData(c echo.Context) error {
 	return c.JSON(200, data)
 }
 
+func (handler *Altimeter) PostAltimeterDataLog(c echo.Context) error {
+	// 現在までのデータをログに追記
+	err := handler.makeLogJson(handler.DataHistory)
+	if err != nil {
+		return c.String(500, fmt.Sprintf("Error writing altimeter data log: %v", err))
+	}
+	// ログファイルのリネーム
+	err = os.Rename("temp_altimeter_log.json", fmt.Sprintf("altimeter_log_%s.json", time.Now().Format("20060102_150405")))
+	if err != nil {
+		return c.String(500, fmt.Sprintf("Error renaming altimeter log file: %v", err))
+	}
+	// ログファイルのリネームが成功したら履歴をクリア
+	handler.DataHistory = []AltimeterData{}
+	// データのDLリンクを返す
+	return c.String(200, fmt.Sprintf("Download Link for Altimeter Data: %s", "https://example.com/download/altimeter_data.json"))
+}
+
 // 現在のデータ履歴を取得する
 func (handler *Altimeter) GetAltimeterHistory(c echo.Context) error {
 	// 履歴データを返す
@@ -44,22 +61,39 @@ func (handler *Altimeter) addData(data AltimeterData) {
 	// データを履歴に追加
 	handler.DataHistory = append(handler.DataHistory, data)
 	// 履歴が200件を超えたらjsonに書き込んで古い100件のデータを削除
-	if len(handler.DataHistory) > 20 {
-		// JSONファイルに書き込む
-		file, _ := os.OpenFile("altimeter_log.json", os.O_RDWR|os.O_CREATE, 0600)
-		defer file.Close()
-		fi, _ := file.Stat()
-		leng := fi.Size()
-
-		json_, _ := json.Marshal(handler.DataHistory[:10])
-
-		if leng == 0 {
-			file.Write(fmt.Appendf(nil, `%s`, json_))
-		} else {
-			// 頭の1文字[は削る
-			json_ = json_[1:]
-			file.WriteAt(fmt.Appendf(nil, `,%s`, json_), leng-1)
-		}
-		handler.DataHistory = handler.DataHistory[len(handler.DataHistory)-10:]
+	if len(handler.DataHistory) > 200 {
+		handler.makeLogJson(handler.DataHistory[:100])
+		handler.DataHistory = handler.DataHistory[len(handler.DataHistory)-100:]
 	}
+}
+
+func (handler *Altimeter) makeLogJson(data []AltimeterData) error {
+	// JSONファイルに書き込む
+	file, err := os.OpenFile("temp_altimeter_log.json", os.O_RDWR|os.O_CREATE, 0600)
+	if err != nil {
+		return fmt.Errorf("failed to open temp_altimeter_log.json: %w", err)
+	}
+	defer file.Close()
+	fi, _ := file.Stat()
+	leng := fi.Size()
+
+	json_, err := json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("failed to marshal altimeter data: %w", err)
+	}
+
+	if leng == 0 {
+		_, err = file.Write(fmt.Appendf(nil, `%s`, json_))
+		if err != nil {
+			return fmt.Errorf("failed to write to temp_altimeter_log.json: %w", err)
+		}
+	} else {
+		// 頭の1文字[は削る
+		json_ = json_[1:]
+		_, err = file.WriteAt(fmt.Appendf(nil, `,%s`, json_), leng-1)
+		if err != nil {
+			return fmt.Errorf("failed to write to temp_altimeter_log.json: %w", err)
+		}
+	}
+	return nil
 }
