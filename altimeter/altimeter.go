@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/TitechMeister/Neon/cloudstorage"
 	"github.com/labstack/echo"
 )
 
@@ -41,12 +42,17 @@ func (handler *Altimeter) PostAltimeterDataLog(c echo.Context) error {
 		return c.String(500, fmt.Sprintf("Error writing altimeter data log: %v", err))
 	}
 	// ログファイルのリネーム
-	err = os.Rename("temp_altimeter_log.json", fmt.Sprintf("altimeter_log_%s.json", time.Now().Format("20060102_150405")))
+	newName := fmt.Sprintf("altimeter_log_%s.json", time.Now().Format("20060102_150405"))
+	err = os.Rename("temp_altimeter_log.json", newName)
 	if err != nil {
 		return c.String(500, fmt.Sprintf("Error renaming altimeter log file: %v", err))
 	}
 	// ログファイルのリネームが成功したら履歴をクリア
 	handler.DataHistory = []AltimeterData{}
+	err = cloudstorage.UploadFile(c.Response().Writer, "25_logs", newName)
+	if err != nil {
+		return c.String(500, fmt.Sprintf("Error uploading altimeter log file: %v", err))
+	}
 	// データのDLリンクを返す
 	return c.String(200, fmt.Sprintf("Download Link for Altimeter Data: %s", "https://example.com/download/altimeter_data.json"))
 }
@@ -61,9 +67,9 @@ func (handler *Altimeter) addData(data AltimeterData) {
 	// データを履歴に追加
 	handler.DataHistory = append(handler.DataHistory, data)
 	// 履歴が200件を超えたらjsonに書き込んで古い100件のデータを削除
-	if len(handler.DataHistory) > 200 {
-		handler.makeLogJson(handler.DataHistory[:100])
-		handler.DataHistory = handler.DataHistory[len(handler.DataHistory)-100:]
+	if len(handler.DataHistory) > 20 {
+		handler.makeLogJson(handler.DataHistory[:10])
+		handler.DataHistory = handler.DataHistory[len(handler.DataHistory)-10:]
 	}
 }
 
