@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"net/http"
 	"os"
 	"time"
 
@@ -15,19 +16,43 @@ import (
 func New() *Altimeter {
 	return &Altimeter{
 		DataHistory: []AltimeterData{},
+		Client:      &http.Client{}, // HTTPクライアントを初期化
 	}
 }
 
 // Altimeterエンドポイント→現在はモックデータとしてAltimeter構造体のJSONを返す
 func (handler *Altimeter) GetAltimeterData(c echo.Context) error {
 	// モックデータを返す
-	data := AltimeterData{
-		Altitude:    100.0 + rand.Float64()*50.0, // Random altitude between 100 and 150 meters
-		Pressure:    1013.25,
-		Temperature: 20.0,
-		Humidity:    50.0,
-		Timestamp:   time.Now(), // Example timestamp
-		DeviceID:    "device123",
+	data := AltimeterData{}
+	if os.Getenv("MODE") == "mock" {
+		data = AltimeterData{
+			DeviceID:     255,
+			Altitude:     100.0 + rand.Float64()*50.0, // Random altitude between 100 and 150 meters
+			Temperature:  20.0,
+			Timestamp:    00000000, // Example timestamp
+			ReceivedTime: 11111111, // Example received time
+		}
+	} else {
+		// 実際のデータを取得する
+		fmt.Println("Fetching altimeter data from the server...")
+		req, err := http.NewRequest("GET", "http://localhost:7878/data/Ultrasonic", nil)
+		// http.NewRequestを使ってGETリクエストを作成
+		fmt.Println("Request created:", req)
+		if err != nil {
+			return c.String(500, fmt.Sprintf("Error creating request: %v", err))
+		}
+		res, err := handler.Client.Do(req)
+		if err != nil {
+			return c.String(500, fmt.Sprintf("Error asking request: %v", err))
+		}
+		defer res.Body.Close()
+		if res.StatusCode != 200 {
+			return c.String(res.StatusCode, fmt.Sprintf("Error fetching altimeter data: %s", res.Status))
+		}
+		// レスポンスボディをデコード
+		if err := json.NewDecoder(res.Body).Decode(&data); err != nil {
+			return c.String(500, fmt.Sprintf("Error decoding altimeter data: %v", err))
+		}
 	}
 	// データを履歴に追加
 	handler.addData(data)

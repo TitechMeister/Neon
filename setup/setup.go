@@ -6,8 +6,10 @@ import (
 	"github.com/labstack/echo/middleware"
 )
 
-func Setup() *echo.Echo{
+func Setup() *echo.Echo {
 	altimeter := altimeter.New() // Create a new instance of the Altimeter struct
+	// Initialize the Altimeter instance, which is a struct that handles altimeter data.
+
 	e := echoSetup(altimeter)
 	return e // Return the Echo instance with the configured routes
 }
