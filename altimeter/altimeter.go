@@ -15,7 +15,7 @@ import (
 // 新しいAltimeterの構造体を返す
 func New() *Altimeter {
 	return &Altimeter{
-		DataHistory: []AltimeterData{},
+		DataHistory: []AltimeterRawData{},
 		Client:      &http.Client{}, // HTTPクライアントを初期化
 	}
 }
@@ -23,14 +23,14 @@ func New() *Altimeter {
 // Altimeterエンドポイント→現在はモックデータとしてAltimeter構造体のJSONを返す
 func (handler *Altimeter) GetAltimeterData(c echo.Context) error {
 	// モックデータを返す
-	data := AltimeterData{}
+	data := AltimeterRawData{}
 	if os.Getenv("MODE") == "mock" {
-		data = AltimeterData{
-			DeviceID:     255,
-			Altitude:     100.0 + rand.Float64()*50.0, // Random altitude between 100 and 150 meters
+		data = AltimeterRawData{
+			DeviceID:     1,
+			Altitude:     10 - rand.Float64()*10.0, // Random altitude between 100 and 150 meters
 			Temperature:  20.0,
-			Timestamp:    00000000, // Example timestamp
-			ReceivedTime: 11111111, // Example received time
+			Timestamp:    1234567890,    // Example timestamp
+			ReceivedTime: 1622547800000, // Example received time
 		}
 	} else {
 		// 実際のデータを取得する
@@ -57,7 +57,8 @@ func (handler *Altimeter) GetAltimeterData(c echo.Context) error {
 	// データを履歴に追加
 	handler.addData(data)
 	// JSON形式でデータを返す
-	return c.JSON(200, data)
+	formattedData := handler.formatAltimeterData(data)
+	return c.JSON(200, formattedData)
 }
 
 func (handler *Altimeter) PostAltimeterDataLog(c echo.Context) error {
@@ -74,7 +75,7 @@ func (handler *Altimeter) PostAltimeterDataLog(c echo.Context) error {
 		return c.String(500, fmt.Sprintf("Error renaming altimeter log file: %v", err))
 	}
 	// ログファイルのリネームが成功したら履歴をクリア
-	handler.DataHistory = []AltimeterData{}
+	handler.DataHistory = []AltimeterRawData{}
 	url, err := cloudstorage.UploadFile(c.Response().Writer, "25_logs", newName)
 	if err != nil {
 		return c.String(500, fmt.Sprintf("Error uploading altimeter log file: %v", err))
@@ -91,7 +92,7 @@ func (handler *Altimeter) GetAltimeterHistory(c echo.Context) error {
 	return c.JSON(200, handler.DataHistory)
 }
 
-func (handler *Altimeter) addData(data AltimeterData) {
+func (handler *Altimeter) addData(data AltimeterRawData) {
 	// データを履歴に追加
 	handler.DataHistory = append(handler.DataHistory, data)
 	// 履歴が200件を超えたらjsonに書き込んで古い100件のデータを削除
@@ -101,7 +102,7 @@ func (handler *Altimeter) addData(data AltimeterData) {
 	}
 }
 
-func (handler *Altimeter) makeLogJson(data []AltimeterData) error {
+func (handler *Altimeter) makeLogJson(data []AltimeterRawData) error {
 	// JSONファイルに書き込む
 	file, err := os.OpenFile("temp_altimeter_log.json", os.O_RDWR|os.O_CREATE, 0600)
 	if err != nil {
@@ -130,4 +131,15 @@ func (handler *Altimeter) makeLogJson(data []AltimeterData) error {
 		}
 	}
 	return nil
+}
+
+func (handler *Altimeter) formatAltimeterData(data AltimeterRawData) AltimeterData {
+	// AltimeterRawDataをAltimeterDataに変換する
+	return AltimeterData{
+		DeviceID:     data.DeviceID,
+		Altitude:     data.Altitude,
+		Temperature:  data.Temperature,
+		ReceivedTime: time.Unix(data.ReceivedTime/1000, 0), // ミリ秒から秒に変換
+	}
+
 }
