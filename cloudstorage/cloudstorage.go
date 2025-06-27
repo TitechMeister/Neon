@@ -48,7 +48,7 @@ func UploadFile(w io.Writer, bucket, objectName string) (*string, error) {
 	if err := wc.Close(); err != nil {
 		return nil, fmt.Errorf("Writer.Close: %w", err)
 	}
-	fmt.Fprintf(w, "Blob %v uploaded.\n", objectName)
+	fmt.Println(w, "Blob %v uploaded.\n", objectName)
 	url, err := GenerateSignedURL(bucket, objectName, time.Hour*24) // Generate a signed URL for the uploaded object
 	if err != nil {
 		return nil, fmt.Errorf("OnGenerateSignedURL: %w", err)

@@ -62,6 +62,7 @@ func (handler *Altimeter) GetAltimeterData(c echo.Context) error {
 
 func (handler *Altimeter) PostAltimeterDataLog(c echo.Context) error {
 	// 現在までのデータをログに追記
+	res := &AltimeterDLlink{}
 	err := handler.makeLogJson(handler.DataHistory)
 	if err != nil {
 		return c.String(500, fmt.Sprintf("Error writing altimeter data log: %v", err))
@@ -79,7 +80,9 @@ func (handler *Altimeter) PostAltimeterDataLog(c echo.Context) error {
 		return c.String(500, fmt.Sprintf("Error uploading altimeter log file: %v", err))
 	}
 	// データのDLリンクを返す
-	return c.String(200, fmt.Sprintf("Download Link for Altimeter Data: %s", *url))
+	res.DownloadLink = *url
+	res.Timestamp = time.Now()
+	return c.JSON(200, res)
 }
 
 // 現在のデータ履歴を取得する

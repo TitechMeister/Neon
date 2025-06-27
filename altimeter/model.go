@@ -2,6 +2,7 @@ package altimeter
 
 import (
 	"net/http"
+	"time"
 )
 
 // altimeter model
@@ -25,4 +26,11 @@ type Altimeter struct {
 	DataHistory []AltimeterData `json:"data_history"`
 	// httpクライアント
 	Client *http.Client `json:"client"` // Uncomment if you need an HTTP client for requests
+}
+
+type AltimeterDLlink struct {
+	// Download link for the altimeter data
+	DownloadLink string `json:"download_link"`
+	// Timestamp of the download link creation
+	Timestamp time.Time `json:"timestamp"`
 }
