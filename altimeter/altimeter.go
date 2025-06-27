@@ -74,12 +74,12 @@ func (handler *Altimeter) PostAltimeterDataLog(c echo.Context) error {
 	}
 	// ログファイルのリネームが成功したら履歴をクリア
 	handler.DataHistory = []AltimeterData{}
-	err = cloudstorage.UploadFile(c.Response().Writer, "25_logs", newName)
+	url, err := cloudstorage.UploadFile(c.Response().Writer, "25_logs", newName)
 	if err != nil {
 		return c.String(500, fmt.Sprintf("Error uploading altimeter log file: %v", err))
 	}
 	// データのDLリンクを返す
-	return c.String(200, fmt.Sprintf("Download Link for Altimeter Data: %s", "https://example.com/download/altimeter_data.json"))
+	return c.String(200, fmt.Sprintf("Download Link for Altimeter Data: %s", *url))
 }
 
 // 現在のデータ履歴を取得する
