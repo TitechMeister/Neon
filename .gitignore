@@ -31,8 +31,9 @@ go.work.sum
 titechmeister-neon-*.json
 
 # logfile
-*_log_*.json
+*_log*.json
 
+.DS_Store
 # Editor/IDE
 # .idea/
 # .vscode/
