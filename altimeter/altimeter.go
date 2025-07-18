@@ -20,8 +20,13 @@ func New() *Altimeter {
 	}
 }
 
+func (a *Altimeter) GetSencorName() string {
+	// センサーの名前を返す
+	return "altimeter"
+}
+
 // Altimeterエンドポイント→現在はモックデータとしてAltimeter構造体のJSONを返す
-func (handler *Altimeter) GetAltimeterData(c echo.Context) error {
+func (handler *Altimeter) GetData(c echo.Context) error {
 	// モックデータを返す
 	data := AltimeterRawData{}
 	if os.Getenv("MODE") == "mock" {
@@ -35,7 +40,7 @@ func (handler *Altimeter) GetAltimeterData(c echo.Context) error {
 	} else {
 		// 実際のデータを取得する
 		fmt.Println("Fetching altimeter data from the server...")
-		req, err := http.NewRequest("GET", "http://localhost:7878/data/Ultrasonic", nil)
+		req, err := http.NewRequest("GET", "http://localhost:7878/data/ultrasonic", nil)
 		// http.NewRequestを使ってGETリクエストを作成
 		fmt.Println("Request created:", req)
 		if err != nil {
@@ -61,7 +66,7 @@ func (handler *Altimeter) GetAltimeterData(c echo.Context) error {
 	return c.JSON(200, formattedData)
 }
 
-func (handler *Altimeter) PostAltimeterDataLog(c echo.Context) error {
+func (handler *Altimeter) LogData(c echo.Context) error {
 	// 現在までのデータをログに追記
 	res := &AltimeterDLlink{}
 	err := handler.makeLogJson(handler.DataHistory)
@@ -87,7 +92,7 @@ func (handler *Altimeter) PostAltimeterDataLog(c echo.Context) error {
 }
 
 // 現在のデータ履歴を取得する
-func (handler *Altimeter) GetAltimeterHistory(c echo.Context) error {
+func (handler *Altimeter) GetHistory(c echo.Context) error {
 	// 履歴データを返す
 	return c.JSON(200, handler.DataHistory)
 }
