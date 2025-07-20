@@ -2,6 +2,10 @@ package setup
 
 import (
 	"github.com/TitechMeister/Neon/altimeter"
+	"github.com/TitechMeister/Neon/gps"
+	"github.com/TitechMeister/Neon/pitot"
+	"github.com/TitechMeister/Neon/servo"
+	"github.com/TitechMeister/Neon/tacho"
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
 )
@@ -9,8 +13,16 @@ import (
 func Setup() *echo.Echo {
 	app := &Neon{}
 	altimeter := altimeter.New() // Create a new instance of the Altimeter struct
+	gps := gps.New()             // Create a new instance of the GPS struct
+	pitot := pitot.New()         // Create a new instance of the Pitot struct
+	tacho := tacho.New()         // Create a new instance of the TachoMeter struct
+	servo := servo.New()         // Create a new instance of the Servo struct
 	// Initialize the Altimeter instance, which is a struct that handles altimeter data.
 	app.AddSencor(altimeter) // Add the Altimeter instance to the Neon application
+	app.AddSencor(gps)       // Add the GPS instance to the Neon application
+	app.AddSencor(pitot)     // Add the Pitot instance to the Neon application
+	app.AddSencor(tacho)     // Add the TachoMeter instance to the Neon application
+	app.AddSencor(servo)     // Add the Servo instance to the Neon
 	e := app.echoSetup()
 	return e // Return the Echo instance with the configured routes
 }
