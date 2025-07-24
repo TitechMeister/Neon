@@ -34,6 +34,13 @@ func (handler *Pitot) GetData(c echo.Context) error {
 	}
 	data := handler.DataHistory[len(handler.DataHistory)-1]
 
+	// UI用JSONファイルに保存
+	err := handler.makeUILogJson(data)
+	if err != nil {
+		// ログ保存エラーがあってもレスポンスは継続
+		fmt.Printf("Warning: Failed to save UI log for Pitot: %v\n", err)
+	}
+
 	// JSON形式でデータを返す
 	return c.JSON(200, data)
 }
@@ -49,7 +56,7 @@ func (handler *Pitot) LogData() error {
 			ID:           1,
 			Timestamp:    uint32(time.Now().Unix()),
 			Temperature:  float32(15.0 + rand.Float64()*10.0),    // Random temperature between 15-25°C
-			Velocity:     float32(5.0 + rand.Float64()*145.0),    // Random velocity between 5-150 m/s
+			Velocity:     float32(rand.Float64()*10.0),    // Random velocity between 5-150 m/s
 			PressureVRaw: float32(1000.0 + rand.Float64()*200.0), // Random pressure 1000-1200
 			PressureARaw: float32(800.0 + rand.Float64()*300.0),  // Random pressure 800-1100
 			PressureSRaw: float32(900.0 + rand.Float64()*250.0),  // Random pressure 900-1150
@@ -97,6 +104,21 @@ func (handler *Pitot) PostData(c echo.Context) error {
 	if err != nil {
 		return c.String(500, fmt.Sprintf("Error renaming pitot log file: %v", err))
 	}
+
+	// UI用ログファイルの処理
+	uiNewName := fmt.Sprintf("logs_ui/pitot_ui_log_%s.json", time.Now().Format("20060102_150405"))
+	// logs_uiディレクトリを作成（存在しない場合）
+	err = os.MkdirAll("logs_ui", 0755)
+	if err != nil {
+		fmt.Printf("Warning: Failed to create logs_ui directory: %v\n", err)
+	} else {
+		// UI用ログファイルをリネーム
+		err = os.Rename("temp_pitot_ui_log.json", uiNewName)
+		if err != nil {
+			fmt.Printf("Warning: Failed to rename UI log file: %v\n", err)
+		}
+	}
+
 	// ログファイルのリネームが成功したら履歴をクリア
 	handler.DataHistory = []PitotData{}
 	url, err := cloudstorage.UploadFile(c.Response().Writer, "25_logs", newName)
@@ -151,6 +173,37 @@ func (handler *Pitot) makeLogJson(data []PitotData) error {
 		_, err = file.WriteAt(fmt.Appendf(nil, `,%s`, json_), leng-1)
 		if err != nil {
 			return fmt.Errorf("failed to write to temp_pitot_log.json: %w", err)
+		}
+	}
+	return nil
+}
+
+func (handler *Pitot) makeUILogJson(data PitotData) error {
+	// UI用JSONファイルに書き込む
+	file, err := os.OpenFile("temp_pitot_ui_log.json", os.O_RDWR|os.O_CREATE, 0600)
+	if err != nil {
+		return fmt.Errorf("failed to open temp_pitot_ui_log.json: %w", err)
+	}
+	defer file.Close()
+	fi, _ := file.Stat()
+	leng := fi.Size()
+
+	json_, err := json.Marshal([]PitotData{data})
+	if err != nil {
+		return fmt.Errorf("failed to marshal Pitot UI data: %w", err)
+	}
+
+	if leng == 0 {
+		_, err = file.Write(fmt.Appendf(nil, `%s`, json_))
+		if err != nil {
+			return fmt.Errorf("failed to write to temp_pitot_ui_log.json: %w", err)
+		}
+	} else {
+		// 頭の1文字[は削る
+		json_ = json_[1:]
+		_, err = file.WriteAt(fmt.Appendf(nil, `,%s`, json_), leng-1)
+		if err != nil {
+			return fmt.Errorf("failed to write to temp_pitot_ui_log.json: %w", err)
 		}
 	}
 	return nil

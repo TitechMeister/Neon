@@ -29,7 +29,17 @@ func (a *Altimeter) GetSencorName() string {
 // Altimeterエンドポイント→現在はモックデータとしてAltimeter構造体のJSONを返す
 func (handler *Altimeter) GetData(c echo.Context) error {
 	// DataHistoryの最新一件
+	if len(handler.DataHistory) == 0 {
+		return c.String(404, "No Altimeter data available")
+	}
 	data := handler.DataHistory[len(handler.DataHistory)-1]
+
+	// UI用JSONファイルに保存
+	err := handler.makeUILogJson(data)
+	if err != nil {
+		// ログ保存エラーがあってもレスポンスは継続
+		fmt.Printf("Warning: Failed to save UI log for altimeter: %v\n", err)
+	}
 
 	// JSON形式でデータを返す
 	formattedData := handler.formatData(data)
@@ -96,6 +106,21 @@ func (handler *Altimeter) PostData(c echo.Context) error {
 	if err != nil {
 		return c.String(500, fmt.Sprintf("Error renaming altimeter log file: %v", err))
 	}
+
+	// UI用ログファイルの処理
+	uiNewName := fmt.Sprintf("logs_ui/altimeter_ui_log_%s.json", time.Now().Format("20060102_150405"))
+	// logs_uiディレクトリを作成（存在しない場合）
+	err = os.MkdirAll("logs_ui", 0755)
+	if err != nil {
+		fmt.Printf("Warning: Failed to create logs_ui directory: %v\n", err)
+	} else {
+		// UI用ログファイルをリネーム
+		err = os.Rename("temp_altimeter_ui_log.json", uiNewName)
+		if err != nil {
+			fmt.Printf("Warning: Failed to rename UI log file: %v\n", err)
+		}
+	}
+
 	// ログファイルのリネームが成功したら履歴をクリア
 	handler.DataHistory = []AltimeterRawData{}
 	url, err := cloudstorage.UploadFile(c.Response().Writer, "25_logs", newName)
@@ -155,12 +180,44 @@ func (handler *Altimeter) makeLogJson(data []AltimeterRawData) error {
 	return nil
 }
 
+func (handler *Altimeter) makeUILogJson(data AltimeterRawData) error {
+	// UI用JSONファイルに書き込む
+	file, err := os.OpenFile("temp_altimeter_ui_log.json", os.O_RDWR|os.O_CREATE, 0600)
+	if err != nil {
+		return fmt.Errorf("failed to open temp_altimeter_ui_log.json: %w", err)
+	}
+	defer file.Close()
+	fi, _ := file.Stat()
+	leng := fi.Size()
+
+	// フォーマットされたデータを使用
+	formattedData := handler.formatData(data)
+	json_, err := json.Marshal([]AltimeterUIData{formattedData})
+	if err != nil {
+		return fmt.Errorf("failed to marshal altimeter UI data: %w", err)
+	}
+
+	if leng == 0 {
+		_, err = file.Write(fmt.Appendf(nil, `%s`, json_))
+		if err != nil {
+			return fmt.Errorf("failed to write to temp_altimeter_ui_log.json: %w", err)
+		}
+	} else {
+		// 頭の1文字[は削る
+		json_ = json_[1:]
+		_, err = file.WriteAt(fmt.Appendf(nil, `,%s`, json_), leng-1)
+		if err != nil {
+			return fmt.Errorf("failed to write to temp_altimeter_ui_log.json: %w", err)
+		}
+	}
+	return nil
+}
+
 func (handler *Altimeter) formatData(data AltimeterRawData) AltimeterUIData {
 	// AltimeterRawDataをAltimeterDataに変換する
 	return AltimeterUIData{
 		DeviceID:     data.DeviceID,
 		Altitude:     data.Altitude,
-		Temperature:  data.Temperature,
 		ReceivedTime: time.UnixMilli(time.Now().UnixMilli()), // ミリ秒から秒に変換
 	}
 

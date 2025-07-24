@@ -12,8 +12,8 @@ type AltimeterUIData struct {
 	DeviceID uint8 `json:"id"`
 	// Altitude in meters
 	Altitude float64 `json:"altitude"`
-	// Temperature in Celsius
-	Temperature float64 `json:"temperature"`
+	// // Temperature in Celsius
+	// Temperature float64 `json:"temperature"`
 	// // Timestamp of the measurement
 	// Timestamp int32 `json:"timestamp"`
 	// Device ID of the altimeter

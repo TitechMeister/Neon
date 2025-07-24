@@ -41,7 +41,7 @@ func (app *Neon) AddSencor(sencor Sencor) {
 }
 
 func (app *Neon) loggerSetup(sencor Sencor) {
-	// altimeter内の関数LogDataをgoroutineを用いて0.5sごとに実行
+	// altimeter内の関数LogDataをgoroutineを用いて周波数に合わせて実行
 	go func() {
 		// This function sets up a logger for the Altimeter instance.
 		fmt.Println("Setting up logger for sencor:", sencor.GetSencorName())

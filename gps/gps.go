@@ -36,6 +36,13 @@ func (handler *GPS) GetData(c echo.Context) error {
 	}
 	data := handler.DataHistory[len(handler.DataHistory)-1]
 
+	// UI用JSONファイルに保存
+	err := handler.makeUILogJson(data)
+	if err != nil {
+		// ログ保存エラーがあってもレスポンスは継続
+		fmt.Printf("Warning: Failed to save UI log for GPS: %v\n", err)
+	}
+
 	// JSON形式でデータを返す
 	formattedData := handler.formatGPSData(data)
 	return c.JSON(200, formattedData)
@@ -54,6 +61,21 @@ func (handler *GPS) PostData(c echo.Context) error {
 	if err != nil {
 		return c.String(500, fmt.Sprintf("Error renaming GPS log file: %v", err))
 	}
+
+	// UI用ログファイルの処理
+	uiNewName := fmt.Sprintf("logs_ui/gps_ui_log_%s.json", time.Now().Format("20060102_150405"))
+	// logs_uiディレクトリを作成（存在しない場合）
+	err = os.MkdirAll("logs_ui", 0755)
+	if err != nil {
+		fmt.Printf("Warning: Failed to create logs_ui directory: %v\n", err)
+	} else {
+		// UI用ログファイルをリネーム
+		err = os.Rename("temp_gps_ui_log.json", uiNewName)
+		if err != nil {
+			fmt.Printf("Warning: Failed to rename UI log file: %v\n", err)
+		}
+	}
+
 	// ログファイルのリネームが成功したら履歴をクリア
 	handler.DataHistory = []GPSData{}
 	url, err := cloudstorage.UploadFile(c.Response().Writer, "25_logs", newName)
@@ -246,6 +268,39 @@ func (handler *GPS) makeLogJson(data []GPSData) error {
 		_, err = file.WriteAt(fmt.Appendf(nil, `,%s`, json_), leng-1)
 		if err != nil {
 			return fmt.Errorf("failed to write to temp_gps_log.json: %w", err)
+		}
+	}
+	return nil
+}
+
+func (handler *GPS) makeUILogJson(data GPSData) error {
+	// UI用JSONファイルに書き込む
+	file, err := os.OpenFile("temp_gps_ui_log.json", os.O_RDWR|os.O_CREATE, 0600)
+	if err != nil {
+		return fmt.Errorf("failed to open temp_gps_ui_log.json: %w", err)
+	}
+	defer file.Close()
+	fi, _ := file.Stat()
+	leng := fi.Size()
+
+	// フォーマットされたデータを使用
+	formattedData := handler.formatGPSData(data)
+	json_, err := json.Marshal([]GPSUIData{formattedData})
+	if err != nil {
+		return fmt.Errorf("failed to marshal GPS UI data: %w", err)
+	}
+
+	if leng == 0 {
+		_, err = file.Write(fmt.Appendf(nil, `%s`, json_))
+		if err != nil {
+			return fmt.Errorf("failed to write to temp_gps_ui_log.json: %w", err)
+		}
+	} else {
+		// 頭の1文字[は削る
+		json_ = json_[1:]
+		_, err = file.WriteAt(fmt.Appendf(nil, `,%s`, json_), leng-1)
+		if err != nil {
+			return fmt.Errorf("failed to write to temp_gps_ui_log.json: %w", err)
 		}
 	}
 	return nil
