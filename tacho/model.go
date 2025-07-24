@@ -14,8 +14,9 @@ type TachoData struct {
 }
 
 type TachoMeter struct {
-	DataHistory []TachoData  `json:"data_history"`
-	Client      *http.Client `json:"client"` // HTTP client for requests
+	DataHistory  []TachoData  `json:"data_history"`
+	Client       *http.Client `json:"client"`        // HTTP client for requests
+	LogFrequency int          `json:"log_frequency"` // Frequency of logging data in a second
 }
 
 type TachoDLlink struct {

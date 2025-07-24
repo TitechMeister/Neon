@@ -23,8 +23,9 @@ type GPSData struct {
 }
 
 type GPS struct {
-	DataHistory []GPSData    `json:"data_history"`
-	Client      *http.Client `json:"client"` // HTTP client for requests
+	DataHistory  []GPSData    `json:"data_history"`
+	Client       *http.Client `json:"client"`        // HTTP client for requests
+	LogFrequency int          `json:"log_frequency"` // Frequency of logging data in a second
 }
 
 type GPSDLlink struct {

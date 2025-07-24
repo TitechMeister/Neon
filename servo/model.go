@@ -31,6 +31,7 @@ type ServoData struct {
 type Servo struct {
 	DataHistory      []ServoData  `json:"data_history"`
 	Client           *http.Client `json:"-"`
+	LogFrequency     int          `json:"log_frequency"` // Frequency of logging data in a second
 	RevElevatorValue []float64
 	RevRudderValue   []float64
 }
@@ -44,8 +45,8 @@ type ServoUIData struct {
 	Rudder              float64 `json:"rudder"`
 	Elevator            float64 `json:"elevator"`
 	Trim                float64 `json:"trim"`
-	RudderActualAngle    float64 `json:"rudder_actual_angle"`
-	ElevatorActualAngle  float64 `json:"elevator_actual_angle"`
+	RudderActualAngle   float64 `json:"rudder_actual_angle"`
+	ElevatorActualAngle float64 `json:"elevator_actual_angle"`
 	RudderTemperature   float64 `json:"rudder_temperature"`
 	ElevatorTemperature float64 `json:"elevator_temperature"`
 	ReceivedTime        uint64  `json:"received_time"`

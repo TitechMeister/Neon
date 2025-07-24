@@ -7,7 +7,7 @@ import (
 
 // altimeter model
 // 中身は相談しながら決める
-type AltimeterData struct {
+type AltimeterUIData struct {
 	// Device ID of the altimeter
 	DeviceID uint8 `json:"id"`
 	// Altitude in meters
@@ -39,6 +39,8 @@ type Altimeter struct {
 	DataHistory []AltimeterRawData `json:"data_history"`
 	// httpクライアント
 	Client *http.Client `json:"client"` // Uncomment if you need an HTTP client for requests
+	// ログ更新周波数
+	LogFrequency int `json:"log_frequency"` // Frequency of logging data in a second
 }
 
 type AltimeterDLlink struct {

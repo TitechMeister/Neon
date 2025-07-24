@@ -16,8 +16,9 @@ type PitotData struct {
 }
 
 type Pitot struct {
-	DataHistory []PitotData  `json:"data_history"` // データ履歴
-	Client      *http.Client `json:"client"`       // HTTPクライアント
+	DataHistory  []PitotData  `json:"data_history"`  // データ履歴
+	Client       *http.Client `json:"client"`        // HTTPクライアント
+	LogFrequency int          `json:"log_frequency"` // Frequency of logging data in a second
 }
 
 type PitotDLlink struct {

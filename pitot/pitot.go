@@ -13,10 +13,11 @@ import (
 )
 
 // 新しいPitotの構造体を返す
-func New() *Pitot {
+func New(logFrequency int) *Pitot {
 	return &Pitot{
-		DataHistory: []PitotData{},
-		Client:      &http.Client{}, // HTTPクライアントを初期化
+		DataHistory:  []PitotData{},
+		Client:       &http.Client{}, // HTTPクライアントを初期化
+		LogFrequency: logFrequency,   // ログ更新周波数を設定
 	}
 }
 
@@ -27,14 +28,28 @@ func (p *Pitot) GetSencorName() string {
 
 // Pitotエンドポイント→現在はモックデータとしてPitotData構造体のJSONを返す
 func (handler *Pitot) GetData(c echo.Context) error {
-	// モックデータを返す
+	// DataHistoryの最新一件
+	if len(handler.DataHistory) == 0 {
+		return c.String(404, "No Pitot data available")
+	}
+	data := handler.DataHistory[len(handler.DataHistory)-1]
+
+	// JSON形式でデータを返す
+	return c.JSON(200, data)
+}
+
+// localhost:7878を叩いてデータを取得して、履歴に追加する
+// ゴルーチンで一定時間間隔で取得させることを想定
+// UIからの操作とは独立にサーバ内で行う
+// モックモードならモックデータを返す
+func (handler *Pitot) LogData() error {
 	data := PitotData{}
 	if os.Getenv("MODE") == "mock" {
 		data = PitotData{
 			ID:           1,
 			Timestamp:    uint32(time.Now().Unix()),
 			Temperature:  float32(15.0 + rand.Float64()*10.0),    // Random temperature between 15-25°C
-			Velocity:     float32(5.0 + rand.Float64()*5.0),   // Random velocity between 50-150 m/s
+			Velocity:     float32(5.0 + rand.Float64()*145.0),    // Random velocity between 5-150 m/s
 			PressureVRaw: float32(1000.0 + rand.Float64()*200.0), // Random pressure 1000-1200
 			PressureARaw: float32(800.0 + rand.Float64()*300.0),  // Random pressure 800-1100
 			PressureSRaw: float32(900.0 + rand.Float64()*250.0),  // Random pressure 900-1150
@@ -43,28 +58,30 @@ func (handler *Pitot) GetData(c echo.Context) error {
 		// 実際のデータを取得する
 		fmt.Println("Fetching pitot data from the server...")
 		req, err := http.NewRequest("GET", "http://localhost:7878/data/pitot", nil)
-		// http.NewRequestを使ってGETリクエストを作成
-		fmt.Println("Request created:", req)
 		if err != nil {
-			return c.String(500, fmt.Sprintf("Error creating request: %v", err))
+			return err
 		}
 		res, err := handler.Client.Do(req)
 		if err != nil {
-			return c.String(500, fmt.Sprintf("Error asking request: %v", err))
+			return err
 		}
 		defer res.Body.Close()
 		if res.StatusCode != 200 {
-			return c.String(res.StatusCode, fmt.Sprintf("Error fetching pitot data: %s", res.Status))
+			return fmt.Errorf("server returned status %d", res.StatusCode)
 		}
 		// レスポンスボディをデコード
 		if err := json.NewDecoder(res.Body).Decode(&data); err != nil {
-			return c.String(500, fmt.Sprintf("Error decoding pitot data: %v", err))
+			return err
 		}
 	}
 	// データを履歴に追加
 	handler.addData(data)
-	// JSON形式でデータを返す
-	return c.JSON(200, data)
+	return nil
+}
+
+func (handler *Pitot) GetLogFrequency() int {
+	// ログ更新周波数を返す
+	return handler.LogFrequency
 }
 
 func (handler *Pitot) PostData(c echo.Context) error {

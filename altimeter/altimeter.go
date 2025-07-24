@@ -13,10 +13,11 @@ import (
 )
 
 // 新しいAltimeterの構造体を返す
-func New() *Altimeter {
+func New(logflequenty int) *Altimeter {
 	return &Altimeter{
-		DataHistory: []AltimeterRawData{},
-		Client:      &http.Client{}, // HTTPクライアントを初期化
+		DataHistory:  []AltimeterRawData{},
+		Client:       &http.Client{}, // HTTPクライアントを初期化
+		LogFrequency: logflequenty,   // ログ更新周波数を設定
 	}
 }
 
@@ -31,7 +32,7 @@ func (handler *Altimeter) GetData(c echo.Context) error {
 	data := handler.DataHistory[len(handler.DataHistory)-1]
 
 	// JSON形式でデータを返す
-	formattedData := handler.formatAltimeterData(data)
+	formattedData := handler.formatData(data)
 	return c.JSON(200, formattedData)
 }
 
@@ -75,6 +76,11 @@ func (handler *Altimeter) LogData() error {
 	handler.addData(data)
 	return nil
 
+}
+
+func (handler *Altimeter) GetLogFrequency() int {
+	// ログ更新周波数を返す
+	return handler.LogFrequency
 }
 
 func (handler *Altimeter) PostData(c echo.Context) error {
@@ -149,9 +155,9 @@ func (handler *Altimeter) makeLogJson(data []AltimeterRawData) error {
 	return nil
 }
 
-func (handler *Altimeter) formatAltimeterData(data AltimeterRawData) AltimeterData {
+func (handler *Altimeter) formatData(data AltimeterRawData) AltimeterUIData {
 	// AltimeterRawDataをAltimeterDataに変換する
-	return AltimeterData{
+	return AltimeterUIData{
 		DeviceID:     data.DeviceID,
 		Altitude:     data.Altitude,
 		Temperature:  data.Temperature,

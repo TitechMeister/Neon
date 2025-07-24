@@ -15,10 +15,11 @@ import (
 )
 
 // 新しいGPSの構造体を返す
-func New() *GPS {
+func New(logFrequency int) *GPS {
 	return &GPS{
-		DataHistory: []GPSData{},
-		Client:      &http.Client{}, // HTTPクライアントを初期化
+		DataHistory:  []GPSData{},
+		Client:       &http.Client{}, // HTTPクライアントを初期化
+		LogFrequency: logFrequency,   // ログ更新周波数を設定
 	}
 }
 
@@ -29,54 +30,15 @@ func (g *GPS) GetSencorName() string {
 
 // GPSエンドポイント→現在はモックデータとしてGPSData構造体のJSONを返す
 func (handler *GPS) GetData(c echo.Context) error {
-	// モックデータを返す
-	data := GPSData{}
-	if os.Getenv("MODE") == "mock" {
-		now := time.Now()
-		// 琵琶湖上の竹生島付近の座標（緯度: 35.2786, 経度: 136.0952）
-		data = GPSData{
-			ID:           1,
-			FixMode:      3,                            // 3D fix
-			PDOP:         uint16(100 + rand.Intn(200)), // Random PDOP between 100-300
-			Year:         uint16(now.Year()),
-			ITow:         uint32(now.Unix()),
-			Unixtime:     uint32(now.Unix()),
-			Lon:          uint32(1360952000 + rand.Intn(1000000)), // 136.0952 (竹生島付近) + ランダム
-			Lat:          uint32(352786000 + rand.Intn(1000000)),  // 35.2786 (竹生島付近) + ランダム
-			Height:       uint32(50000 + rand.Intn(100000)),       // Random height 50-150m (in mm)
-			HAcc:         uint32(1000 + rand.Intn(5000)),          // Horizontal accuracy 1-6m (in mm)
-			VAcc:         uint32(2000 + rand.Intn(8000)),          // Vertical accuracy 2-10m (in mm)
-			GSpeed:       uint32(rand.Intn(50000)),                // Random ground speed 0-50 m/s (in mm/s)
-			HeadMot:      uint32(rand.Intn(360000000)),            // Random heading 0-360 degrees (in 1e-5 degrees)
-			ReceivedTime: uint64(now.UnixMilli()),
-		}
-	} else {
-		// 実際のデータを取得する
-		fmt.Println("Fetching GPS data from the server...")
-		req, err := http.NewRequest("GET", "http://localhost:7878/data/gps", nil)
-		// http.NewRequestを使ってGETリクエストを作成
-		fmt.Println("Request created:", req)
-		if err != nil {
-			return c.String(500, fmt.Sprintf("Error creating request: %v", err))
-		}
-		res, err := handler.Client.Do(req)
-		if err != nil {
-			return c.String(500, fmt.Sprintf("Error asking request: %v", err))
-		}
-		defer res.Body.Close()
-		if res.StatusCode != 200 {
-			return c.String(res.StatusCode, fmt.Sprintf("Error fetching GPS data: %s", res.Status))
-		}
-		// レスポンスボディをデコード
-		if err := json.NewDecoder(res.Body).Decode(&data); err != nil {
-			return c.String(500, fmt.Sprintf("Error decoding GPS data: %v", err))
-		}
+	// DataHistoryの最新一件
+	if len(handler.DataHistory) == 0 {
+		return c.String(404, "No GPS data available")
 	}
-	// データを履歴に追加
-	handler.addData(data)
-	ret := handler.formatGPSData(data)
+	data := handler.DataHistory[len(handler.DataHistory)-1]
+
 	// JSON形式でデータを返す
-	return c.JSON(200, ret)
+	formattedData := handler.formatGPSData(data)
+	return c.JSON(200, formattedData)
 }
 
 func (handler *GPS) PostData(c echo.Context) error {
@@ -191,6 +153,61 @@ func (handler *GPS) PostTarget(c echo.Context) error {
 
 	// 成功レスポンスを返す
 	return c.JSON(http.StatusOK, map[string]string{"message": "Target data added successfully"})
+}
+
+// localhost:7878を叩いてデータを取得して、履歴に追加する
+// ゴルーチンで一定時間間隔で取得させることを想定
+// UIからの操作とは独立にサーバ内で行う
+// モックモードならモックデータを返す
+func (handler *GPS) LogData() error {
+	data := GPSData{}
+	if os.Getenv("MODE") == "mock" {
+		now := time.Now()
+		// 琵琶湖上の竹生島付近の座標（緯度: 35.2786, 経度: 136.0952）
+		data = GPSData{
+			ID:           1,
+			FixMode:      3,                            // 3D fix
+			PDOP:         uint16(100 + rand.Intn(200)), // Random PDOP between 100-300
+			Year:         uint16(now.Year()),
+			ITow:         uint32(now.Unix()),
+			Unixtime:     uint32(now.Unix()),
+			Lon:          uint32(1360952000 + rand.Intn(1000000)), // 136.0952 (竹生島付近) + ランダム
+			Lat:          uint32(352786000 + rand.Intn(1000000)),  // 35.2786 (竹生島付近) + ランダム
+			Height:       uint32(50000 + rand.Intn(100000)),       // Random height 50-150m (in mm)
+			HAcc:         uint32(1000 + rand.Intn(5000)),          // Horizontal accuracy 1-6m (in mm)
+			VAcc:         uint32(2000 + rand.Intn(8000)),          // Vertical accuracy 2-10m (in mm)
+			GSpeed:       uint32(rand.Intn(50000)),                // Random ground speed 0-50 m/s (in mm/s)
+			HeadMot:      uint32(rand.Intn(360000000)),            // Random heading 0-360 degrees (in 1e-5 degrees)
+			ReceivedTime: uint64(now.UnixMilli()),
+		}
+	} else {
+		// 実際のデータを取得する
+		fmt.Println("Fetching GPS data from the server...")
+		req, err := http.NewRequest("GET", "http://localhost:7878/data/gps", nil)
+		if err != nil {
+			return err
+		}
+		res, err := handler.Client.Do(req)
+		if err != nil {
+			return err
+		}
+		defer res.Body.Close()
+		if res.StatusCode != 200 {
+			return fmt.Errorf("server returned status %d", res.StatusCode)
+		}
+		// レスポンスボディをデコード
+		if err := json.NewDecoder(res.Body).Decode(&data); err != nil {
+			return err
+		}
+	}
+	// データを履歴に追加
+	handler.addData(data)
+	return nil
+}
+
+func (handler *GPS) GetLogFrequency() int {
+	// ログ更新周波数を返す
+	return handler.LogFrequency
 }
 
 func (handler *GPS) addData(data GPSData) {

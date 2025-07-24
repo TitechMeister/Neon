@@ -14,10 +14,11 @@ import (
 )
 
 // 新しいServoの構造体を返す
-func New() *Servo {
+func New(logFrequency int) *Servo {
 	s := &Servo{
 		DataHistory:      []ServoData{},
 		Client:           &http.Client{}, // HTTPクライアントを初期化
+		LogFrequency:     logFrequency,   // ログ更新周波数を設定
 		RevElevatorValue: []float64{},    // 初期化
 		RevRudderValue:   []float64{},    // 初期化
 	}
@@ -34,7 +35,22 @@ func (s *Servo) GetSencorName() string {
 
 // Servoエンドポイント→現在はモックデータとしてServoData構造体のJSONを返す
 func (handler *Servo) GetData(c echo.Context) error {
-	// モックデータを返す
+	// DataHistoryの最新一件
+	if len(handler.DataHistory) == 0 {
+		return c.String(404, "No Servo data available")
+	}
+	data := handler.DataHistory[len(handler.DataHistory)-1]
+
+	// JSON形式でデータを返す
+	dataUI := handler.formatServoData(data)
+	return c.JSON(200, dataUI)
+}
+
+// localhost:7878を叩いてデータを取得して、履歴に追加する
+// ゴルーチンで一定時間間隔で取得させることを想定
+// UIからの操作とは独立にサーバ内で行う
+// モックモードならモックデータを返す
+func (handler *Servo) LogData() error {
 	data := ServoData{}
 	if os.Getenv("MODE") == "mock" {
 		data = ServoData{
@@ -60,26 +76,29 @@ func (handler *Servo) GetData(c echo.Context) error {
 		// http.NewRequestを使ってGETリクエストを作成
 		fmt.Println("Request created:", req)
 		if err != nil {
-			return c.String(500, fmt.Sprintf("Error creating request: %v", err))
+			return err
 		}
 		res, err := handler.Client.Do(req)
 		if err != nil {
-			return c.String(500, fmt.Sprintf("Error asking request: %v", err))
+			return err
 		}
 		defer res.Body.Close()
 		if res.StatusCode != 200 {
-			return c.String(res.StatusCode, fmt.Sprintf("Error fetching servo data: %s", res.Status))
+			return fmt.Errorf("server returned status %d", res.StatusCode)
 		}
 		// レスポンスボディをデコード
 		if err := json.NewDecoder(res.Body).Decode(&data); err != nil {
-			return c.String(500, fmt.Sprintf("Error decoding servo data: %v", err))
+			return err
 		}
 	}
 	// データを履歴に追加
 	handler.addData(data)
-	dataUI := handler.formatServoData(data)
-	// JSON形式でデータを返す
-	return c.JSON(200, dataUI)
+	return nil
+}
+
+func (handler *Servo) GetLogFrequency() int {
+	// ログ更新周波数を返す
+	return handler.LogFrequency
 }
 
 func (handler *Servo) PostData(c echo.Context) error {
