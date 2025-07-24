@@ -8,7 +8,8 @@ type Sencor interface {
 	// Echoサーバ経由のリクエストでデータを取得する
 	GetData(c echo.Context) error
 	// Echoサーバ経由のリクエストでデータをログに記録する
-	LogData(c echo.Context) error
+	PostData(c echo.Context) error
+	// serialサーバを叩いてログ
 	// Echoサーバ経由のリクエストでデータの履歴を取得する
 	GetHistory(c echo.Context) error
 }

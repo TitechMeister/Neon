@@ -79,7 +79,7 @@ func (handler *GPS) GetData(c echo.Context) error {
 	return c.JSON(200, ret)
 }
 
-func (handler *GPS) LogData(c echo.Context) error {
+func (handler *GPS) PostData(c echo.Context) error {
 	// 現在までのデータをログに追記
 	res := &GPSDLlink{}
 	err := handler.makeLogJson(handler.DataHistory)

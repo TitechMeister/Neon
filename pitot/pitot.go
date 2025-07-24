@@ -67,7 +67,7 @@ func (handler *Pitot) GetData(c echo.Context) error {
 	return c.JSON(200, data)
 }
 
-func (handler *Pitot) LogData(c echo.Context) error {
+func (handler *Pitot) PostData(c echo.Context) error {
 	// 現在までのデータをログに追記
 	res := &PitotDLlink{}
 	err := handler.makeLogJson(handler.DataHistory)

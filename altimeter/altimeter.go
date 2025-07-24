@@ -27,7 +27,19 @@ func (a *Altimeter) GetSencorName() string {
 
 // Altimeterエンドポイント→現在はモックデータとしてAltimeter構造体のJSONを返す
 func (handler *Altimeter) GetData(c echo.Context) error {
-	// モックデータを返す
+	// DataHistoryの最新一件
+	data := handler.DataHistory[len(handler.DataHistory)-1]
+
+	// JSON形式でデータを返す
+	formattedData := handler.formatAltimeterData(data)
+	return c.JSON(200, formattedData)
+}
+
+// localhost:7878を叩いてデータを取得して、履歴に追加する
+// ゴルーチンで一定時間間隔で取得させることを想定
+// UIからの操作とは独立にサーバ内で行う
+// モックモードならモックデータを返す
+func (handler *Altimeter) LogData() error {
 	data := AltimeterRawData{}
 	if os.Getenv("MODE") == "mock" {
 		data = AltimeterRawData{
@@ -44,29 +56,28 @@ func (handler *Altimeter) GetData(c echo.Context) error {
 		// http.NewRequestを使ってGETリクエストを作成
 		fmt.Println("Request created:", req)
 		if err != nil {
-			return c.String(500, fmt.Sprintf("Error creating request: %v", err))
+			return err
 		}
 		res, err := handler.Client.Do(req)
 		if err != nil {
-			return c.String(500, fmt.Sprintf("Error asking request: %v", err))
+			return err
 		}
 		defer res.Body.Close()
 		if res.StatusCode != 200 {
-			return c.String(res.StatusCode, fmt.Sprintf("Error fetching altimeter data: %s", res.Status))
+			return err
 		}
 		// レスポンスボディをデコード
 		if err := json.NewDecoder(res.Body).Decode(&data); err != nil {
-			return c.String(500, fmt.Sprintf("Error decoding altimeter data: %v", err))
+			return err
 		}
 	}
 	// データを履歴に追加
 	handler.addData(data)
-	// JSON形式でデータを返す
-	formattedData := handler.formatAltimeterData(data)
-	return c.JSON(200, formattedData)
+	return nil
+
 }
 
-func (handler *Altimeter) LogData(c echo.Context) error {
+func (handler *Altimeter) PostData(c echo.Context) error {
 	// 現在までのデータをログに追記
 	res := &AltimeterDLlink{}
 	err := handler.makeLogJson(handler.DataHistory)

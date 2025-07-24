@@ -65,7 +65,7 @@ func (handler *TachoMeter) GetData(c echo.Context) error {
 	return c.JSON(200, data)
 }
 
-func (handler *TachoMeter) LogData(c echo.Context) error {
+func (handler *TachoMeter) PostData(c echo.Context) error {
 	// 現在までのデータをログに追記
 	res := &TachoDLlink{}
 	err := handler.makeLogJson(handler.DataHistory)

@@ -49,7 +49,7 @@ func (app *Neon) echoSetup() *echo.Echo {
 		// Loop through all sensors in the Neon application and set up their routes.
 		// Each sensor has its own routes for getting data, logging data, and getting history.
 		e.GET("/data/"+(*s).GetSencorName(), (*s).GetData)
-		e.POST("/data/"+(*s).GetSencorName()+"/log", (*s).LogData)
+		e.POST("/data/"+(*s).GetSencorName()+"/log", (*s).PostData)
 		e.GET("/data/"+(*s).GetSencorName()+"/history", (*s).GetHistory)
 		// sencorタイプがGPSの場合
 		if g, ok := (*s).(*gps.GPS); ok {

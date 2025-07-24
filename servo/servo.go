@@ -82,7 +82,7 @@ func (handler *Servo) GetData(c echo.Context) error {
 	return c.JSON(200, dataUI)
 }
 
-func (handler *Servo) LogData(c echo.Context) error {
+func (handler *Servo) PostData(c echo.Context) error {
 	// 現在までのデータをログに追記
 	res := &ServoDLlink{}
 	err := handler.makeLogJson(handler.DataHistory)
