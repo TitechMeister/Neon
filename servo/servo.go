@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"sort"
 	"time"
 
 	"github.com/TitechMeister/Neon/cloudstorage"
@@ -14,10 +15,16 @@ import (
 
 // 新しいServoの構造体を返す
 func New() *Servo {
-	return &Servo{
-		DataHistory: []ServoData{},
-		Client:      &http.Client{}, // HTTPクライアントを初期化
+	s := &Servo{
+		DataHistory:      []ServoData{},
+		Client:           &http.Client{}, // HTTPクライアントを初期化
+		RevElevatorValue: []float64{},    // 初期化
+		RevRudderValue:   []float64{},    // 初期化
 	}
+	// ラダーとエレベータの逆力学モデルを計算しておく
+	s.calculateServoValue()
+	return s
+
 }
 
 func (s *Servo) GetSencorName() string {
@@ -34,14 +41,14 @@ func (handler *Servo) GetData(c echo.Context) error {
 			ID:                  1,
 			Status:              1, // Active status
 			Timestamp:           uint32(time.Now().Unix()),
-			Rudder:              -15.0 + rand.Float64()*30.0, // Random rudder angle -30 to +30 degrees
-			Elevator:            -15.0 + rand.Float64()*30.0, // Random elevator angle -15 to +15 degrees
+			Rudder:              -15.0 + rand.Float64()*30.0, // Random rudder angle -15 to +15 degrees
+			Elevator:            -15.0 + rand.Float64()*20.0, // Random elevator angle -15 to +5 degrees
 			Voltage:             11.0 + rand.Float64()*2.0,   // Random voltage 11-13V
 			RudderCurrent:       1.0 + rand.Float64()*3.0,    // Random current 1-4A
 			ElevatorCurrent:     1.0 + rand.Float64()*3.0,    // Random current 1-4A
-			Trim:                -5.0 + rand.Float64()*10.0,  // Random trim -5 to +5 degrees
-			RudderServoAngle:    -15.0 + rand.Float64()*30.0, // Random servo angle -45 to +45 degrees
-			ElevatorServoAngle:  -5.0 + rand.Float64()*30.0, // Random servo angle -30 to +30 degrees
+			Trim:                -2.5 + rand.Float64()*3.0,   // Random trim -2.5 to +0.5 degrees
+			RudderServoAngle:    -15.0 + rand.Float64()*30.0, // Random rudder angle -15 to +15 degrees
+			ElevatorServoAngle:  -15.0 + rand.Float64()*20.0, // Random elevator angle -15 to +5 degrees
 			RudderTemperature:   25.0 + rand.Float64()*20.0,  // Random temperature 25-45°C
 			ElevatorTemperature: 25.0 + rand.Float64()*20.0,  // Random temperature 25-45°C
 			ReceivedTime:        uint64(time.Now().UnixMilli()),
@@ -70,8 +77,9 @@ func (handler *Servo) GetData(c echo.Context) error {
 	}
 	// データを履歴に追加
 	handler.addData(data)
+	dataUI := handler.formatServoData(data)
 	// JSON形式でデータを返す
-	return c.JSON(200, data)
+	return c.JSON(200, dataUI)
 }
 
 func (handler *Servo) LogData(c echo.Context) error {
@@ -144,4 +152,89 @@ func (handler *Servo) makeLogJson(data []ServoData) error {
 		}
 	}
 	return nil
+}
+
+func (handler *Servo) formatServoData(data ServoData) ServoUIData {
+	rudderIndex := sort.Search(len(handler.RevRudderValue), func(i int) bool {
+		return handler.RevRudderValue[i] >= data.RudderServoAngle
+	})
+	if rudderIndex >= len(handler.RevRudderValue) {
+		rudderIndex = len(handler.RevRudderValue) - 1
+	}
+	elevatorIndex := sort.Search(len(handler.RevElevatorValue), func(i int) bool {
+		return handler.RevElevatorValue[i] <= data.ElevatorServoAngle
+	})
+	if elevatorIndex >= len(handler.RevElevatorValue) {
+		elevatorIndex = len(handler.RevElevatorValue) - 1
+	}
+	return ServoUIData{
+		Timestamp:           data.Timestamp,
+		Rudder:              data.Rudder,
+		Elevator:            data.Elevator,
+		Trim:                data.Trim,
+		RudderActualAngle:   handler.RevRudderValue[rudderIndex],
+		ElevatorActualAngle: handler.RevElevatorValue[elevatorIndex],
+		RudderTemperature:   data.RudderTemperature,
+		ElevatorTemperature: data.ElevatorTemperature,
+		ReceivedTime:        data.ReceivedTime,
+	}
+}
+
+func (handler *Servo) calculateServoValue() {
+	// 後の計算で使うように初期化時にRuddderとElevetorの値を計算しておく
+	// Rudder→引数の値を-20から20で0.01区切りで計算してスライスに格納する
+	for i := -20.0; i <= 20.0; i += 0.01 {
+		handler.RevRudderValue = append(handler.RevRudderValue, calcRudderAngle(i))
+	}
+	// Elevator→引数の値を-20から20で0.01区切りで計算してスライスに格納する
+	for i := -20.0; i <= 20.0; i += 0.01 {
+		handler.RevElevatorValue = append(handler.RevElevatorValue, calcElevatorAngle(i))
+	}
+	// 広義単調増加か確認 ログ出力をする
+	for i := 1; i < len(handler.RevRudderValue); i++ {
+		if handler.RevRudderValue[i] < handler.RevRudderValue[i-1] {
+			fmt.Printf("Rudder value is not monotonic at index %d: %f < %f\n", i, handler.RevRudderValue[i], handler.RevRudderValue[i-1])
+		}
+	}
+	for i := 1; i < len(handler.RevElevatorValue); i++ {
+		if handler.RevElevatorValue[i] > handler.RevElevatorValue[i-1] {
+			fmt.Printf("Elevator value is not monotonic at index %d: %f < %f\n", i, handler.RevElevatorValue[i], handler.RevElevatorValue[i-1])
+		}
+	}
+	fmt.Println("Servo value calculation completed.")
+
+}
+
+// ラダーの逆力学モデル（4次近似）
+func calcRudderAngle(u float64) float64 {
+	const (
+		R_SERVO_COEFF_0 = 4.39
+		R_SERVO_COEFF_1 = 4.21
+		R_SERVO_COEFF_2 = -0.0205
+		R_SERVO_COEFF_3 = 5.84e-3
+		R_SERVO_COEFF_4 = 1.12e-4
+	)
+	return R_SERVO_COEFF_0 +
+		R_SERVO_COEFF_1*u +
+		R_SERVO_COEFF_2*u*u +
+		R_SERVO_COEFF_3*u*u*u +
+		R_SERVO_COEFF_4*u*u*u*u +
+		180.0
+}
+
+// エレベータの逆力学モデル（4次近似）
+func calcElevatorAngle(u float64) float64 {
+	const (
+		E_SERVO_COEFF_0 = -51.2
+		E_SERVO_COEFF_1 = -6.52
+		E_SERVO_COEFF_2 = -0.27
+		E_SERVO_COEFF_3 = -0.0301
+		E_SERVO_COEFF_4 = -8.65e-4
+	)
+	return E_SERVO_COEFF_0 +
+		E_SERVO_COEFF_1*u +
+		E_SERVO_COEFF_2*u*u +
+		E_SERVO_COEFF_3*u*u*u +
+		E_SERVO_COEFF_4*u*u*u*u +
+		180.0
 }
