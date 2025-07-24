@@ -51,6 +51,11 @@ func (app *Neon) echoSetup() *echo.Echo {
 		e.GET("/data/"+(*s).GetSencorName(), (*s).GetData)
 		e.POST("/data/"+(*s).GetSencorName()+"/log", (*s).LogData)
 		e.GET("/data/"+(*s).GetSencorName()+"/history", (*s).GetHistory)
+		// sencorタイプがGPSの場合
+		if g, ok := (*s).(*gps.GPS); ok {
+			// GPSセンサーの特定のルートを設定
+			e.POST("/data/gps/target", (*g).PostTarget)
+		}
 	}
 
 	// e.GET("/altimeter", altimeter.GetAltimeterData)

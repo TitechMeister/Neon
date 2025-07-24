@@ -1,8 +1,10 @@
 package gps
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math/rand"
 	"net/http"
 	"os"
@@ -39,13 +41,13 @@ func (handler *GPS) GetData(c echo.Context) error {
 			Year:         uint16(now.Year()),
 			ITow:         uint32(now.Unix()),
 			Unixtime:     uint32(now.Unix()),
-			Lon:          uint32(1360952000 + rand.Intn(10000)), // 136.0952 (竹生島付近) + ランダム
-			Lat:          uint32(352786000 + rand.Intn(10000)),  // 35.2786 (竹生島付近) + ランダム
-			Height:       uint32(50000 + rand.Intn(100000)),     // Random height 50-150m (in mm)
-			HAcc:         uint32(1000 + rand.Intn(5000)),        // Horizontal accuracy 1-6m (in mm)
-			VAcc:         uint32(2000 + rand.Intn(8000)),        // Vertical accuracy 2-10m (in mm)
-			GSpeed:       uint32(rand.Intn(50000)),              // Random ground speed 0-50 m/s (in mm/s)
-			HeadMot:      uint32(rand.Intn(360000000)),          // Random heading 0-360 degrees (in 1e-5 degrees)
+			Lon:          uint32(1360952000 + rand.Intn(1000000)), // 136.0952 (竹生島付近) + ランダム
+			Lat:          uint32(352786000 + rand.Intn(1000000)),  // 35.2786 (竹生島付近) + ランダム
+			Height:       uint32(50000 + rand.Intn(100000)),       // Random height 50-150m (in mm)
+			HAcc:         uint32(1000 + rand.Intn(5000)),          // Horizontal accuracy 1-6m (in mm)
+			VAcc:         uint32(2000 + rand.Intn(8000)),          // Vertical accuracy 2-10m (in mm)
+			GSpeed:       uint32(rand.Intn(50000)),                // Random ground speed 0-50 m/s (in mm/s)
+			HeadMot:      uint32(rand.Intn(360000000)),            // Random heading 0-360 degrees (in 1e-5 degrees)
 			ReceivedTime: uint64(now.UnixMilli()),
 		}
 	} else {
@@ -72,8 +74,9 @@ func (handler *GPS) GetData(c echo.Context) error {
 	}
 	// データを履歴に追加
 	handler.addData(data)
+	ret := handler.formatGPSData(data)
 	// JSON形式でデータを返す
-	return c.JSON(200, data)
+	return c.JSON(200, ret)
 }
 
 func (handler *GPS) LogData(c echo.Context) error {
@@ -84,7 +87,7 @@ func (handler *GPS) LogData(c echo.Context) error {
 		return c.String(500, fmt.Sprintf("Error writing GPS data log: %v", err))
 	}
 	// ログファイルのリネーム
-	newName := fmt.Sprintf("gps_log_%s.json", time.Now().Format("20060102_150405"))
+	newName := fmt.Sprintf("logs/gps_log_%s.json", time.Now().Format("20060102_150405"))
 	err = os.Rename("temp_gps_log.json", newName)
 	if err != nil {
 		return c.String(500, fmt.Sprintf("Error renaming GPS log file: %v", err))
@@ -105,6 +108,89 @@ func (handler *GPS) LogData(c echo.Context) error {
 func (handler *GPS) GetHistory(c echo.Context) error {
 	// 履歴データを返す
 	return c.JSON(200, handler.DataHistory)
+}
+
+func (handler *GPS) PostTarget(c echo.Context) error {
+	// リクエストボディからTargetDataを取得
+	var targetData TargetData
+	if err := c.Bind(&targetData); err != nil {
+		return c.String(http.StatusBadRequest, fmt.Sprintf("Error binding target data: %v", err))
+	}
+
+	// 受け取ったデータをログ表示
+	fmt.Printf("Received target data: %+v\n", targetData)
+
+	// 受け取ったデータ全体を48個の整数に変換
+	dataBytes := make([]byte, 48)
+	dataBytes[0] = targetData.ID
+	// 1~3はパディング
+	for i := 1; i < 4; i++ {
+		dataBytes[i] = 0 // パディングは0で埋める
+	}
+	dataBytes[4] = byte(targetData.Timestamp >> 24)
+	dataBytes[5] = byte(targetData.Timestamp >> 16)
+	dataBytes[6] = byte(targetData.Timestamp >> 8)
+	dataBytes[7] = byte(targetData.Timestamp)
+	dataBytes[8] = byte(targetData.TargetLon >> 24)
+	dataBytes[9] = byte(targetData.TargetLon >> 16)
+	dataBytes[10] = byte(targetData.TargetLon >> 8)
+	dataBytes[11] = byte(targetData.TargetLon)
+	dataBytes[12] = byte(targetData.TargetLat >> 24)
+	dataBytes[13] = byte(targetData.TargetLat >> 16)
+	dataBytes[14] = byte(targetData.TargetLat >> 8)
+	dataBytes[15] = byte(targetData.TargetLat)
+	// 16~47はデータの内容を埋める
+	for i := 16; i < 48; i++ {
+		if i < len(targetData.Data)+16 {
+			dataBytes[i] = targetData.Data[i-16]
+		} else {
+			dataBytes[i] = 0 // データが足りない場合は0で埋める
+		}
+	}
+	// データバイトのログ表示
+	// 48個の整数に変換したデータをログに出力
+	fmt.Printf("Target data bytes: %x\n", dataBytes)
+
+	// データを履歴に追加
+	var payloadArr [48]byte
+	copy(payloadArr[:], dataBytes)
+	targetPayload := TargetPayload{Payload: payloadArr}
+	// データをjsonとしてread
+	req, err := http.NewRequest("POST", "http://localhost:7878/serial/write", nil)
+	if err != nil {
+		return c.String(http.StatusInternalServerError, fmt.Sprintf("Error creating request: %v", err))
+	}
+	// リクエストヘッダーにContent-Typeを設定
+	req.Header.Set("Content-Type", "application/json")
+	// リクエストボディにtargetPayloadのjsonを設定
+	jsonPayload, err := json.Marshal(targetPayload)
+	if err != nil {
+		return c.String(http.StatusInternalServerError, fmt.Sprintf("Error marshalling target payload: %v", err))
+	}
+	req.ContentLength = int64(len(jsonPayload))
+	req.Body = io.NopCloser(bytes.NewBuffer(jsonPayload))
+	// リクエストを送信
+	res, err := handler.Client.Do(req)
+	if err != nil {
+		return c.String(http.StatusInternalServerError, fmt.Sprintf("Error sending request: %v", err))
+	}
+	defer res.Body.Close()
+
+	// レスポンスボディを読み取る
+	responseBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		return c.String(http.StatusInternalServerError, fmt.Sprintf("Error reading response body: %v", err))
+	}
+	// レスポンスの内容をログに出力
+	fmt.Printf("Response from server: %s\n", responseBody)
+
+	// レスポンスのステータスコードをチェック
+	if res.StatusCode != http.StatusOK {
+		return c.String(res.StatusCode, fmt.Sprintf("Error sending target data: %s", res.Status))
+	}
+
+	// 成功レスポンスを返す
+	return c.JSON(http.StatusOK, map[string]string{"message": "Target data added successfully"})
 }
 
 func (handler *GPS) addData(data GPSData) {
@@ -146,4 +232,14 @@ func (handler *GPS) makeLogJson(data []GPSData) error {
 		}
 	}
 	return nil
+}
+
+func (handler *GPS) formatGPSData(data GPSData) GPSUIData {
+	// データ履歴を返す
+	return GPSUIData{
+		Unixtime:     data.Unixtime,
+		Lon:          data.Lon,
+		Lat:          data.Lat,
+		ReceivedTime: data.ReceivedTime,
+	}
 }

@@ -74,7 +74,7 @@ func (handler *Altimeter) LogData(c echo.Context) error {
 		return c.String(500, fmt.Sprintf("Error writing altimeter data log: %v", err))
 	}
 	// ログファイルのリネーム
-	newName := fmt.Sprintf("altimeter_log_%s.json", time.Now().Format("20060102_150405"))
+	newName := fmt.Sprintf("logs/altimeter_log_%s.json", time.Now().Format("20060102_150405"))
 	err = os.Rename("temp_altimeter_log.json", newName)
 	if err != nil {
 		return c.String(500, fmt.Sprintf("Error renaming altimeter log file: %v", err))
@@ -144,7 +144,7 @@ func (handler *Altimeter) formatAltimeterData(data AltimeterRawData) AltimeterDa
 		DeviceID:     data.DeviceID,
 		Altitude:     data.Altitude,
 		Temperature:  data.Temperature,
-		ReceivedTime: time.Unix(data.ReceivedTime/1000, 0), // ミリ秒から秒に変換
+		ReceivedTime: time.UnixMilli(time.Now().UnixMilli()), // ミリ秒から秒に変換
 	}
 
 }

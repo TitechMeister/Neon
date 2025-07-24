@@ -75,7 +75,7 @@ func (handler *Pitot) LogData(c echo.Context) error {
 		return c.String(500, fmt.Sprintf("Error writing pitot data log: %v", err))
 	}
 	// ログファイルのリネーム
-	newName := fmt.Sprintf("pitot_log_%s.json", time.Now().Format("20060102_150405"))
+	newName := fmt.Sprintf("logs/pitot_log_%s.json", time.Now().Format("20060102_150405"))
 	err = os.Rename("temp_pitot_log.json", newName)
 	if err != nil {
 		return c.String(500, fmt.Sprintf("Error renaming pitot log file: %v", err))

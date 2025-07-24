@@ -73,7 +73,7 @@ func (handler *TachoMeter) LogData(c echo.Context) error {
 		return c.String(500, fmt.Sprintf("Error writing tachometer data log: %v", err))
 	}
 	// ログファイルのリネーム
-	newName := fmt.Sprintf("tachometer_log_%s.json", time.Now().Format("20060102_150405"))
+	newName := fmt.Sprintf("logs/tachometer_log_%s.json", time.Now().Format("20060102_150405"))
 	err = os.Rename("temp_tachometer_log.json", newName)
 	if err != nil {
 		return c.String(500, fmt.Sprintf("Error renaming tachometer log file: %v", err))

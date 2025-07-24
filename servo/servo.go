@@ -34,14 +34,14 @@ func (handler *Servo) GetData(c echo.Context) error {
 			ID:                  1,
 			Status:              1, // Active status
 			Timestamp:           uint32(time.Now().Unix()),
-			Rudder:              -30.0 + rand.Float64()*60.0, // Random rudder angle -30 to +30 degrees
+			Rudder:              -15.0 + rand.Float64()*30.0, // Random rudder angle -30 to +30 degrees
 			Elevator:            -15.0 + rand.Float64()*30.0, // Random elevator angle -15 to +15 degrees
 			Voltage:             11.0 + rand.Float64()*2.0,   // Random voltage 11-13V
 			RudderCurrent:       1.0 + rand.Float64()*3.0,    // Random current 1-4A
 			ElevatorCurrent:     1.0 + rand.Float64()*3.0,    // Random current 1-4A
 			Trim:                -5.0 + rand.Float64()*10.0,  // Random trim -5 to +5 degrees
-			RudderServoAngle:    -45.0 + rand.Float64()*90.0, // Random servo angle -45 to +45 degrees
-			ElevatorServoAngle:  -30.0 + rand.Float64()*60.0, // Random servo angle -30 to +30 degrees
+			RudderServoAngle:    -15.0 + rand.Float64()*30.0, // Random servo angle -45 to +45 degrees
+			ElevatorServoAngle:  -5.0 + rand.Float64()*30.0, // Random servo angle -30 to +30 degrees
 			RudderTemperature:   25.0 + rand.Float64()*20.0,  // Random temperature 25-45°C
 			ElevatorTemperature: 25.0 + rand.Float64()*20.0,  // Random temperature 25-45°C
 			ReceivedTime:        uint64(time.Now().UnixMilli()),
@@ -82,7 +82,7 @@ func (handler *Servo) LogData(c echo.Context) error {
 		return c.String(500, fmt.Sprintf("Error writing servo data log: %v", err))
 	}
 	// ログファイルのリネーム
-	newName := fmt.Sprintf("servo_log_%s.json", time.Now().Format("20060102_150405"))
+	newName := fmt.Sprintf("logs/servo_log_%s.json", time.Now().Format("20060102_150405"))
 	err = os.Rename("temp_servo_log.json", newName)
 	if err != nil {
 		return c.String(500, fmt.Sprintf("Error renaming servo log file: %v", err))

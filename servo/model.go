@@ -5,6 +5,12 @@ import (
 	"time"
 )
 
+// hoge無印→入力された値
+// Current→流れる電流
+// hogeServoAngle→実際のサーボの角度→頑張って対応させるしか...
+// 矢印→
+// 温度表示...
+// rad -15~15 trim + elv 3.6~-14 trim -5~+2
 type ServoData struct {
 	ID                  uint8   `json:"id"`
 	Status              uint8   `json:"status"`
@@ -30,4 +36,16 @@ type Servo struct {
 type ServoDLlink struct {
 	DownloadLink string    `json:"download_link"`
 	Timestamp    time.Time `json:"timestamp"`
+}
+
+type ServoUIData struct {
+	Rudder							float64 `json:"rudder"`
+	Elevator						float64 `json:"elevator"`
+	Trim							float64 `json:"trim"`
+	RudderServoAngle				float64 `json:"rudder_servo_angle"`
+	ElevatorServoAngle				float64 `json:"elevator_servo_angle"`
+	RudderTemperature				float64 `json:"rudder_temperature"`
+	ElevatorTemperature				float64 `json:"elevator_temperature"`
+	ReceivedTime					uint64  `json:"received_time"`
+	Timestamp						uint32  `json:"timestamp"`
 }

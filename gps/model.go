@@ -31,3 +31,22 @@ type GPSDLlink struct {
 	DownloadLink string    `json:"download_link"`
 	Timestamp    time.Time `json:"timestamp"`
 }
+
+type GPSUIData struct {
+	Unixtime     uint32 `json:"unixtime"`
+	Lon          uint32 `json:"lon"`
+	Lat          uint32 `json:"lat"`
+	ReceivedTime uint64 `json:"received_time"`
+}
+
+type TargetData struct {
+	ID        uint8    `json:"id"`
+	Timestamp uint32   `json:"timestamp"`
+	TargetLon int32    `json:"target_lon"`
+	TargetLat int32    `json:"target_lat"`
+	Data      [32]byte `json:"data"`
+}
+
+type TargetPayload struct {
+	Payload [48]byte `json:"payload"`
+}
