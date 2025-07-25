@@ -1,6 +1,9 @@
 package setup
 
-import "github.com/labstack/echo"
+import (
+	"github.com/TitechMeister/Neon/port"
+	"github.com/labstack/echo"
+)
 
 type Sencor interface {
 	// センサーの名前を取得する
@@ -19,4 +22,5 @@ type Sencor interface {
 
 type Neon struct {
 	Sencors []*Sencor
+	Port    *port.Port
 }

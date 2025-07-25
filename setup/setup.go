@@ -2,11 +2,13 @@ package setup
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/TitechMeister/Neon/altimeter"
 	"github.com/TitechMeister/Neon/gps"
 	"github.com/TitechMeister/Neon/pitot"
+	"github.com/TitechMeister/Neon/port"
 	"github.com/TitechMeister/Neon/servo"
 	"github.com/TitechMeister/Neon/tacho"
 	"github.com/labstack/echo"
@@ -15,6 +17,8 @@ import (
 
 func Setup() *echo.Echo {
 	app := &Neon{}
+	app.Port = port.New()         // Create a new instance of the Port struct
+	app.portChecker()             // Start checking the port status periodically
 	altimeter := altimeter.New(2) // Create a new instance of the Altimeter struct
 	gps := gps.New(1)             // Create a new instance of the GPS struct
 	pitot := pitot.New(2)         // Create a new instance of the Pitot struct
@@ -31,6 +35,14 @@ func Setup() *echo.Echo {
 		app.loggerSetup(*sensor)
 	}
 	e := app.echoSetup()
+	err := os.MkdirAll("logs/test", 0755)
+	if err != nil {
+		fmt.Printf("Warning: Failed to create logs directory: %v\n", err)
+	}
+	err = os.MkdirAll("logs_ui/test", 0755)
+	if err != nil {
+		fmt.Printf("Warning: Failed to create logs_ui directory: %v\n", err)
+	}
 	return e // Return the Echo instance with the configured routes
 }
 
@@ -57,6 +69,24 @@ func (app *Neon) loggerSetup(sencor Sencor) {
 	}()
 }
 
+func (app *Neon) portChecker() {
+	// This function checks the port status periodically.
+	// It can be used to monitor the connection state of the port and handle reconnections if necessary.
+	go func() {
+		ticker := time.NewTicker(10 * time.Second) // Check every 10 seconds
+		defer ticker.Stop()
+
+		for range ticker.C {
+			state, err := app.Port.CheckPort()
+			if err != nil {
+				fmt.Printf("Error checking port: %v\n", err)
+			} else {
+				fmt.Printf("Port state: %s\n", state)
+			}
+		}
+	}()
+}
+
 func (app *Neon) echoSetup() *echo.Echo {
 	// Echoのセットアップを行う
 	// ここにEchoのルーティングやミドルウェアの設定を追加する
@@ -68,6 +98,10 @@ func (app *Neon) echoSetup() *echo.Echo {
 
 	// Create a new Echo instance, which is a web framework for Go.
 	e.GET("/ping", ping)
+	e.GET("/port", app.Port.GetAvailablePorts)
+	e.GET("/port/state", app.Port.GetPortState) // Add a route to get the current port state
+	e.POST("/port/connect", app.Port.ConnectPort)
+	e.POST("/port/disconnect", app.Port.DisconnectPort)
 	for _, sencor := range app.Sencors {
 		s := sencor // Create a local variable to avoid closure issues in the loop
 		// Loop through all sensors in the Neon application and set up their routes.
@@ -95,4 +129,10 @@ func (app *Neon) echoSetup() *echo.Echo {
 func ping(c echo.Context) error {
 	// This is a simple handler function that responds with "pong" when the /ping endpoint is accessed.
 	return c.String(200, "pong")
+}
+
+func postLogNotOnUI(c echo.Context) error {
+	// This function is a placeholder for handling POST requests to log data on the UI.
+	// Currently, it does not perform any actions but can be implemented later.
+	return c.String(200, "Log data received")
 }
